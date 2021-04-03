@@ -1,0 +1,1 @@
+# Wearable IoT dog's heart rate and activity sensor
