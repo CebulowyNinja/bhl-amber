@@ -1,0 +1,3 @@
+#!/bin/bash
+
+mosquitto_pub -h 54.36.99.31 -u mqttuser -P mqttpassword -t /test -m "test"
