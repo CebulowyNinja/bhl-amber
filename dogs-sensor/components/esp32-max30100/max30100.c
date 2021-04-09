@@ -27,7 +27,7 @@ esp_err_t max30100_init( max30100_config_t* this,
                          max30100_current_t start_red_current,
                          uint8_t mean_filter_size,
                          uint8_t pulse_bpm_sample_size,
-                         bool high_res_mode,
+                         max30100_adc_range_t adc_range,
                          bool debug )
 {
     this->i2c_num = i2c_num;
@@ -55,6 +55,9 @@ esp_err_t max30100_init( max30100_config_t* this,
     esp_err_t ret = max30100_set_mode(this, mode);
     if(ret != ESP_OK) return ret;
 
+    ret = max330100_set_slots(this, MAX30100_SLOT_RED, MAX30100_SLOT_IR, MAX30100_SLOT_NONE, MAX30100_SLOT_NONE);
+    if(ret != ESP_OK) return ret;
+
     ret = max30100_set_sampling_rate(this, sampling_rate);
     if(ret != ESP_OK) return ret;
     ret = max30100_set_pulse_width(this, pulse_width);
@@ -66,7 +69,8 @@ esp_err_t max30100_init( max30100_config_t* this,
     this->ir_current = ir_current;
     ret = max30100_set_led_current(this, this->red_current, ir_current);
     if(ret != ESP_OK) return ret;
-    ret = max30100_set_high_res(this, high_res_mode);
+
+    ret = max30100_set_adc_range(this, adc_range);
     if(ret != ESP_OK) return ret;
 
     this->dc_filter_ir.w = 0;
@@ -74,8 +78,6 @@ esp_err_t max30100_init( max30100_config_t* this,
 
     this->dc_filter_red.w = 0;
     this->dc_filter_red.result = 0;
-
-
 
     this->lpb_filter_ir.v[0] = 0;
     this->lpb_filter_ir.v[1] = 0;
@@ -86,12 +88,10 @@ esp_err_t max30100_init( max30100_config_t* this,
     this->mean_diff_ir.sum = 0;
     this->mean_diff_ir.count = 0;
 
-
     memset(this->values_bpm, 0, sizeof(float)*pulse_bpm_sample_size);
     this->values_bpm_sum = 0;
     this->values_bpm_count = 0;
     this->bpm_index = 0;
-
 
     this->ir_ac_sq_sum = 0;
     this->red_ac_sq_sum = 0;
@@ -127,7 +127,6 @@ esp_err_t max30100_update(max30100_config_t* this, max30100_data_t* data) {
 
     float mean_diff_res_ir = max30100_mean_diff( this,
                                                  this->dc_filter_ir.result );
-
     max30100_lpb_filter(this, mean_diff_res_ir/*-dcFilterIR.result*/);
 
     this->ir_ac_sq_sum += this->dc_filter_ir.result * this->dc_filter_ir.result;
@@ -139,9 +138,9 @@ esp_err_t max30100_update(max30100_config_t* this, max30100_data_t* data) {
         data->pulse_detected=true;
         this->pulses_detected++;
 
-        float ratio_rms = log( sqrt( this->red_ac_sq_sum /
+        float ratio_rms = log(sqrt( this->red_ac_sq_sum /
                                      (float)this->samples_recorded ) ) /
-                          log( sqrt( this->ir_ac_sq_sum /
+                          log(sqrt( this->ir_ac_sq_sum /
                                      (float)this->samples_recorded ) );
 
         if(this->debug)
@@ -409,21 +408,14 @@ esp_err_t max30100_set_mode(max30100_config_t* this, max30100_mode_t mode) {
                                     (current_mode_reg & 0xF8) | mode );
 }
 
-esp_err_t max30100_set_high_res(max30100_config_t* this, bool enabled) {
+esp_err_t max30100_set_adc_range(max30100_config_t* this, max30100_adc_range_t adc_range) {
     uint8_t previous;
 
     //Tratar erros
     esp_err_t ret = max30100_read_register(this, MAX30100_SPO2_CONF, &previous);
-    if(ret != ESP_OK) return ret;
-    if(enabled) {
-        return max30100_write_register( this,
-                                        MAX30100_SPO2_CONF,
-                                        previous | MAX30100_SPO2_HI_RES_EN );
-    } else {
-        return max30100_write_register( this,
-                                        MAX30100_SPO2_CONF,
-                                        previous & ~MAX30100_SPO2_HI_RES_EN );
-    }
+    return max30100_write_register( this,
+                                    MAX30100_SPO2_CONF,
+                                    ((previous & 0x60) | (adc_range << 5)));
 }
 
 esp_err_t max30100_set_sampling_rate( max30100_config_t* this,
@@ -461,9 +453,13 @@ esp_err_t max30100_set_led_current( max30100_config_t* this,
                                     max30100_current_t ir_current )
 {
     //Tratar erros
+    esp_err_t ret = max30100_write_register( this,
+                                    MAX30100_LED1_CONF,
+                                    red_current);
+    if(ret != ESP_OK) return ret;
     return max30100_write_register( this,
-                                    MAX30100_LED_CONF,
-                                    (red_current << 4) | ir_current );
+                                    MAX30100_LED2_CONF,
+                                    ir_current);
 }
 
 esp_err_t max30100_set_acceptable_intense_difff( max30100_config_t* this, 
@@ -503,17 +499,27 @@ esp_err_t max30100_set_pulse_max_threshold(max30100_config_t* this, uint16_t pul
     return ESP_OK;
 }
 
+esp_err_t max330100_set_slots(max30100_config_t* this,  
+    uint8_t slot1, uint8_t slot2, uint8_t slot3, uint8_t slot4) {
+    esp_err_t ret =  max30100_write_register(this,
+                                        MAX30100_SLOT_21,
+                                        (slot2<<4) | (slot1));
+    if(ret != ESP_OK) return ret;
+
+    return max30100_write_register(this,
+                                   MAX30100_SLOT_43,
+                                   (slot4<<4) | (slot3));
+}
+
+esp_err_t max330100_start_read_temperature(max30100_config_t* this) {
+    return max30100_write_register(this,
+                                   MAX30100_TEMP_CONFIG,
+                                   MAX30100_MODE_TEMP_EN);
+}
 esp_err_t max330100_read_temperature(max30100_config_t* this, float* temperature) {
-    uint8_t current_mode_reg;
-    //Tratar erros
-    esp_err_t ret = max30100_read_register( this,
-                                            MAX30100_MODE_CONF,
-                                            &current_mode_reg );
+    esp_err_t ret = max330100_start_read_temperature(this);
     if(ret != ESP_OK) return ret;
-    ret = max30100_write_register( this,
-                                   MAX30100_MODE_CONF,
-                                   current_mode_reg | MAX30100_MODE_TEMP_EN );
-    if(ret != ESP_OK) return ret;
+
     //This can be changed to a while loop, (with interrupt flag!)
     //there is an interrupt flag for when temperature has been read.
     vTaskDelay(100/portTICK_PERIOD_MS);
@@ -536,10 +542,10 @@ esp_err_t max330100_read_temperature(max30100_config_t* this, float* temperature
 esp_err_t max30100_read_fifo(max30100_config_t* this, max30100_fifo_t* fifo) {
     uint8_t buffer[4];
     //Testar erros
-    esp_err_t ret = max30100_read_from(this, MAX30100_FIFO_DATA, buffer, 4);
+    esp_err_t ret = max30100_read_from(this, MAX30100_FIFO_DATA, buffer, 6);
     if(ret != ESP_OK) return ret;
-    fifo->raw_ir = ((uint16_t)buffer[0] << 8) | buffer[1];
-    fifo->raw_red = ((uint16_t)buffer[2] << 8) | buffer[3];
+    fifo->raw_red = (((uint16_t)buffer[0] << 14) | ((uint16_t) buffer[1] << 6) | (buffer[2] >> 2));
+    fifo->raw_ir = (((uint16_t)buffer[3] << 14) | ((uint16_t) buffer[4] << 6) | (buffer[5] >> 2));
 
     return ESP_OK;
 }
@@ -592,7 +598,7 @@ float max30100_mean_diff( max30100_config_t* this, float M )
 esp_err_t max30100_print_registers(max30100_config_t* this)
 {
     uint8_t int_status, int_enable, fifo_write, fifo_ovf_cnt, fifo_read;
-    uint8_t fifo_data, mode_conf, sp02_conf, led_conf, temp_int, temp_frac;
+    uint8_t fifo_data, mode_conf, sp02_conf, led1_conf, led2_conf, slot21_conf, slot43_conf, temp_int, temp_frac;
     uint8_t rev_id, part_id;
     esp_err_t ret;
 
@@ -614,7 +620,13 @@ esp_err_t max30100_print_registers(max30100_config_t* this)
     if(ret != ESP_OK) return ret;
     ret = max30100_read_register(this, MAX30100_SPO2_CONF, &sp02_conf);
     if(ret != ESP_OK) return ret;
-    ret = max30100_read_register(this, MAX30100_LED_CONF, &led_conf);
+    ret = max30100_read_register(this, MAX30100_LED1_CONF, &led1_conf);
+    if(ret != ESP_OK) return ret;
+    ret = max30100_read_register(this, MAX30100_LED1_CONF, &led2_conf);
+    if(ret != ESP_OK) return ret;
+    ret = max30100_read_register(this, MAX30100_SLOT_21, &slot21_conf);
+    if(ret != ESP_OK) return ret;
+    ret = max30100_read_register(this, MAX30100_SLOT_43, &slot43_conf);
     if(ret != ESP_OK) return ret;
     ret = max30100_read_register(this, MAX30100_TEMP_INT, &temp_int);
     if(ret != ESP_OK) return ret;
@@ -631,13 +643,16 @@ esp_err_t max30100_print_registers(max30100_config_t* this)
     printf("%x\n", fifo_ovf_cnt);
     printf("%x\n", fifo_read);
     printf("%x\n", fifo_data);
-    printf("%x\n", mode_conf);
-    printf("%x\n", sp02_conf);
-    printf("%x\n", led_conf);
-    printf("%x\n", temp_int);
-    printf("%x\n", temp_frac);
-    printf("%x\n", rev_id);
-    printf("%x\n", part_id);
+    printf("MODE=%x\n", mode_conf);
+    printf("SP02=%x\n", sp02_conf);
+    printf("LED1=%x\n", led1_conf);
+    printf("LED2=%x\n", led2_conf);
+    printf("SLOT21=%x\n", slot21_conf);
+    printf("SLOT43=%x\n", slot43_conf);
+    printf("TEMP_INT=%x\n", temp_int);
+    printf("TEMP_FRAC=%x\n", temp_frac);
+    printf("REV=%x\n", rev_id);
+    printf("PART=%x\n", part_id);
 
     return ESP_OK;
 }

@@ -27,9 +27,9 @@
  */
 #define MAX30100_DEFAULT_OPERATING_MODE         MAX30100_MODE_SPO2_HR
 #define MAX30100_DEFAULT_IR_LED_CURRENT         MAX30100_LED_CURRENT_50MA
-#define MAX30100_DEFAULT_START_RED_LED_CURRENT  MAX30100_LED_CURRENT_27_1MA
+#define MAX30100_DEFAULT_START_RED_LED_CURRENT  MAX30100_LED_CURRENT_25_4MA
 #define MAX30100_DEFAULT_SAMPLING_RATE          MAX30100_SAMPLING_RATE_100HZ
-#define MAX30100_DEFAULT_LED_PULSE_WIDTH        MAX30100_PULSE_WIDTH_1600US_ADC_16
+#define MAX30100_DEFAULT_LED_PULSE_WIDTH        MAX30100_PULSE_WIDTH_411US_ADC_18
 #define MAX30100_DEFAULT_ACCEPTABLE_INTENSITY_DIFF      65000
 #define MAX30100_DEFAULT_RED_LED_CURRENT_ADJUSTMENT_MS    500
 #define MAX30100_DEFAULT_RESET_SPO2_EVERY_N_PULSES          4
@@ -39,13 +39,20 @@
 #define MAX30100_DEFAULT_PULSE_MAX_THRESHOLD             2000
 #define MAX30100_DEFAULT_PULSE_BPM_SAMPLE_SIZE             10
 
+typedef enum _max30100_slot_t {
+    MAX30100_SLOT_NONE  = 0x00,
+    MAX30100_SLOT_RED   = 0x01,
+    MAX30100_SLOT_IR    = 0x02
+} _max30100_slot_t;
+
 /**
  * Operation Mode Enum.
  * Heart rate only or Oxigen saturation + Heart rate.
  */
 typedef enum _max30100_mode_t {
     MAX30100_MODE_HR_ONLY                 = 0x02,
-    MAX30100_MODE_SPO2_HR                 = 0x03
+    MAX30100_MODE_SPO2_HR                 = 0x03,
+    MAX30100_MODE_MULTI                   = 0x07
 } max30100_mode_t;
 
 /**
@@ -55,12 +62,12 @@ typedef enum _max30100_mode_t {
 typedef enum SamplingRate {
     MAX30100_SAMPLING_RATE_50HZ           = 0x00,
     MAX30100_SAMPLING_RATE_100HZ          = 0x01,
-    MAX30100_SAMPLING_RATE_167HZ          = 0x02,
-    MAX30100_SAMPLING_RATE_200HZ          = 0x03,
-    MAX30100_SAMPLING_RATE_400HZ          = 0x04,
-    MAX30100_SAMPLING_RATE_600HZ          = 0x05,
-    MAX30100_SAMPLING_RATE_800HZ          = 0x06,
-    MAX30100_SAMPLING_RATE_1000HZ         = 0x07
+    MAX30100_SAMPLING_RATE_200HZ          = 0x02,
+    MAX30100_SAMPLING_RATE_400HZ          = 0x03,
+    MAX30100_SAMPLING_RATE_800HZ          = 0x04,
+    MAX30100_SAMPLING_RATE_1000HZ         = 0x05,
+    MAX30100_SAMPLING_RATE_1600HZ         = 0x06,
+    MAX30100_SAMPLING_RATE_3200HZ         = 0x07
 } max30100_sampling_rate_t;
 
 /**
@@ -68,10 +75,10 @@ typedef enum SamplingRate {
  * Sets from 200us to 1600us.
  */
 typedef enum LEDPulseWidth {
-    MAX30100_PULSE_WIDTH_200US_ADC_13     = 0x00,
-    MAX30100_PULSE_WIDTH_400US_ADC_14     = 0x01,
-    MAX30100_PULSE_WIDTH_800US_ADC_15     = 0x02,
-    MAX30100_PULSE_WIDTH_1600US_ADC_16    = 0x03,
+    MAX30100_PULSE_WIDTH_69US_ADC_15     = 0x00,
+    MAX30100_PULSE_WIDTH_118US_ADC_16    = 0x01,
+    MAX30100_PULSE_WIDTH_215US_ADC_17    = 0x02,
+    MAX30100_PULSE_WIDTH_411US_ADC_18    = 0x03
 } max30100_pulse_width_t;
 
 /**
@@ -80,22 +87,16 @@ typedef enum LEDPulseWidth {
  */
 typedef enum LEDCurrent {
     MAX30100_LED_CURRENT_0MA              = 0x00,
-    MAX30100_LED_CURRENT_4_4MA            = 0x01,
-    MAX30100_LED_CURRENT_7_6MA            = 0x02,
-    MAX30100_LED_CURRENT_11MA             = 0x03,
-    MAX30100_LED_CURRENT_14_2MA           = 0x04,
-    MAX30100_LED_CURRENT_17_4MA           = 0x05,
-    MAX30100_LED_CURRENT_20_8MA           = 0x06,
-    MAX30100_LED_CURRENT_24MA             = 0x07,
-    MAX30100_LED_CURRENT_27_1MA           = 0x08,
-    MAX30100_LED_CURRENT_30_6MA           = 0x09,
-    MAX30100_LED_CURRENT_33_8MA           = 0x0A,
-    MAX30100_LED_CURRENT_37MA             = 0x0B,
-    MAX30100_LED_CURRENT_40_2MA           = 0x0C,
-    MAX30100_LED_CURRENT_43_6MA           = 0x0D,
-    MAX30100_LED_CURRENT_46_8MA           = 0x0E,
-    MAX30100_LED_CURRENT_50MA             = 0x0F
+    MAX30100_LED_CURRENT_25_4MA           = 0x7F,
+    MAX30100_LED_CURRENT_50MA             = 0xFF
 } max30100_current_t;
+
+typedef enum ADCRange {
+    MAX30100_ADC_RANGE_2048nA             = 0x00,
+    MAX30100_ADC_RANGE_4096nA             = 0x01,
+    MAX30100_ADC_RANGE_8192nA             = 0x02,
+    MAX30100_ADC_RANGE_16384nA            = 0x03,
+} max30100_adc_range_t;
 
 /**
  * FIFO configuration structure.
@@ -232,7 +233,7 @@ esp_err_t max30100_init( max30100_config_t* this, i2c_port_t i2c_num,
                          max30100_mode_t mode, max30100_sampling_rate_t sampling_rate, 
                          max30100_pulse_width_t pulse_width, max30100_current_t ir_current,
                          max30100_current_t start_red_current, uint8_t mean_filter_size, 
-                         uint8_t pulse_bpm_sample_size, bool high_res_mode, bool debug );
+                         uint8_t pulse_bpm_sample_size, max30100_adc_range_t adc_range, bool debug );
 
 /**
  * @brief Reads from MAX30100 internal registers and updates internal structures.
@@ -247,6 +248,9 @@ esp_err_t max30100_init( max30100_config_t* this, i2c_port_t i2c_num,
  */
 esp_err_t max30100_update(max30100_config_t* this, max30100_data_t* data);
 
+esp_err_t max330100_set_slots(max30100_config_t* this,  
+    uint8_t slot1, uint8_t slot2, uint8_t slot3, uint8_t slot4);
+
 /**
  * @brief Reads the internal temperature of the MAX30100.
  * 
@@ -255,6 +259,7 @@ esp_err_t max30100_update(max30100_config_t* this, max30100_data_t* data);
  * 
  * @returns status of execution.
  */
+esp_err_t max330100_start_read_temperature(max30100_config_t* this);
 esp_err_t max30100_read_temperature(max30100_config_t* this, float* temperature);
 
 /**
@@ -288,7 +293,7 @@ esp_err_t max30100_set_mode(max30100_config_t* this, max30100_mode_t mode);
  * 
  * @returns status of execution.
  */
-esp_err_t max30100_set_high_res(max30100_config_t* this, bool enabled);
+esp_err_t max30100_set_adc_range(max30100_config_t* this, max30100_adc_range_t adc_range);
 
 /**
  * @brief Sets the led currents.

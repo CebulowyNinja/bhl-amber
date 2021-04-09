@@ -25,23 +25,27 @@
 #define MAX30100_REV_ID                   0xFE
 #define MAX30100_PART_ID                  0xFF
 #define MAX30100_INT_STATUS               0x00
-#define MAX30100_INT_ENABLE               0x01
-#define MAX30100_FIFO_WRITE               0x02
-#define MAX30100_FIFO_OVERFLOW_COUNTER    0x03
-#define MAX30100_FIFO_READ                0x04
-#define MAX30100_FIFO_DATA                0x05
-#define MAX30100_MODE_CONF                0x06
-#define MAX30100_SPO2_CONF                0x07
-#define MAX30100_LED_CONF                 0x09
-#define MAX30100_TEMP_INT                 0x16
-#define MAX30100_TEMP_FRACTION            0x17
+#define MAX30100_INT_ENABLE               0x02
+#define MAX30100_FIFO_WRITE               0x04
+#define MAX30100_FIFO_OVERFLOW_COUNTER    0x05
+#define MAX30100_FIFO_READ                0x06
+#define MAX30100_FIFO_DATA                0x07
+#define MAX30100_MODE_CONF                0x09
+#define MAX30100_SPO2_CONF                0x0A
+#define MAX30100_LED1_CONF                0x0C
+#define MAX30100_LED2_CONF                0x0D
+#define MAX30100_SLOT_21                  0x11
+#define MAX30100_SLOT_43                  0x12
+#define MAX30100_TEMP_INT                 0x1F
+#define MAX30100_TEMP_FRACTION            0x20
+#define MAX30100_TEMP_CONFIG              0x21
 
 /**
  * Bit defines for mode configuration.
  */
 #define MAX30100_MODE_SHDN                (1<<7)
 #define MAX30100_MODE_RESET               (1<<6)
-#define MAX30100_MODE_TEMP_EN             (1<<3)
+#define MAX30100_MODE_TEMP_EN             (1<<0)
 #define MAX30100_SPO2_HI_RES_EN           (1<<6)
 
 /**

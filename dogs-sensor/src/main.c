@@ -31,7 +31,7 @@
 
 #define I2C_SDA 12
 #define I2C_SCL 14
-#define I2C_FRQ 100000
+#define I2C_FRQ 10000
 #define I2C_PORT I2C_NUM_0
 
 max30100_config_t max30100 = {};
@@ -53,15 +53,13 @@ void get_bpm(void* param) {
     max30100_data_t result = {};
     while(true) {
         //Update sensor, saving to "result"
-        ESP_ERROR_CHECK(max30100_update(&max30100, &result));
+        max30100_update(&max30100, &result);
         if(result.pulse_detected) {
             printf("BEAT\n");
             printf("BPM: %f | SpO2: %f%%\n", result.heart_bpm, result.spO2);
         }
         //Update rate: 100Hz
         vTaskDelay(100/portTICK_PERIOD_MS);
-        printf("Print regs\n");
-        max30100_print_registers(&max30100);
     }
 }
 
@@ -70,15 +68,16 @@ void app_main()
     //Init I2C_NUM_0
     ESP_ERROR_CHECK(i2c_master_init(I2C_PORT));
     //Init sensor at I2C_NUM_0
+    vTaskDelay(1000/portTICK_PERIOD_MS);
     ESP_ERROR_CHECK(max30100_init( &max30100, I2C_PORT,
-                   MAX30100_DEFAULT_OPERATING_MODE,
-                   MAX30100_DEFAULT_SAMPLING_RATE,
-                   MAX30100_DEFAULT_LED_PULSE_WIDTH,
-                   MAX30100_DEFAULT_IR_LED_CURRENT,
-                   MAX30100_DEFAULT_START_RED_LED_CURRENT,
+                   MAX30100_MODE_SPO2_HR,
+                   MAX30100_SAMPLING_RATE_100HZ,
+                   MAX30100_PULSE_WIDTH_118US_ADC_16,
+                   MAX30100_LED_CURRENT_50MA/8,
+                   MAX30100_LED_CURRENT_50MA/16,
                    MAX30100_DEFAULT_MEAN_FILTER_SIZE,
                    MAX30100_DEFAULT_PULSE_BPM_SAMPLE_SIZE,
-                   true, false ));
+                   MAX30100_ADC_RANGE_16384nA, true));
     printf("Print regs\n");
     max30100_print_registers(&max30100);
     //Start test task
