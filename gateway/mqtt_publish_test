@@ -1,3 +1,4 @@
 #!/bin/bash
-
-mosquitto_pub -h 54.36.99.31 -u mqttuser -P mqttpassword -t /test -m "test"
+# Send examplary message to Amber Notify Client
+mosquitto_pub -h 54.36.99.31 -u mqttuser -P mqttpassword -t "/dogs/mic/1" \
+-m '{"req":"reset"}'
