@@ -27,6 +27,12 @@
 #include "MAX30105.h"
 
 #include "heartRate.h"
+#include <WiFi.h>
+#include <WiFiUDP.h>
+#include <NTPClient.h>
+#include <ArduinoJson.h>
+#include <PubSubClient.h>
+
 #define INTERRUPT_PIN 18
 // HR
 MAX30105 particleSensor;
@@ -37,6 +43,36 @@ long lastBeat = 0; //Time at which the last beat occurred
 
 float beatsPerMinute;
 int beatAvg;
+
+// WIFI Credentials
+const char* ssid = "TP-Link_OPTO";
+const char* password = "optoopto";
+const char* mqtt_server = "54.36.99.31"; //mqtt server
+const char* mqtt_user = "mqttuser";
+const char* mqtt_pass = "mqttpassword";
+const char* mqtt_in_topic = "/dogs/dog/1/req";
+const char* mqtt_out_topic = "/dogs/dog/1";
+
+// NTP Client
+WiFiUDP ntpUDP;
+WiFiClient espClient;
+NTPClient timeClient(ntpUDP);
+PubSubClient mqttClient(espClient);
+unsigned long timestamp;
+void callback(char* topic, byte* payload, unsigned int length);
+void reconnect();
+
+// JSON codec
+#define STATUS_IS_MOVING  0x01
+#define STATUS_IS_ON_FEET 0x02
+#define STATUS_IS_ON_SIDE 0x04
+uint32_t status;
+uint32_t last_publish;
+
+#define JSON_BUFFER_LEN 1024
+DynamicJsonDocument doc(JSON_BUFFER_LEN);
+char buffer[JSON_BUFFER_LEN];
+size_t bytes_written;
 
 typedef struct _hr_rate_t
 {
@@ -62,14 +98,42 @@ void setup()
 {
   Serial.begin(115200);
   Serial.println("Initializing...");
+  Serial.print("Connecting to ");
+  Serial.println(ssid);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  // Print local IP address and start web server
+  Serial.println("");
+  Serial.println("WiFi connected.");
+  Serial.println("IP address: ");
+  Serial.println(WiFi.localIP());
+  timeClient.begin();
+  // Set offset time in seconds to adjust for your timezone, for example:
+  // GMT +1 = 3600
+  // GMT +8 = 28800
+  // GMT -1 = -3600
+  // GMT 0 = 0
+  timeClient.setTimeOffset(2*3600);
+  mqttClient.setServer(mqtt_server, 1883);
+  mqttClient.setCallback(callback);
   hr_rate_init();
   acc_init();
+  last_publish = millis();
 }
 
 hr_rate_t hr_rate_meas();
 acc_data_t acc_loop();
 void loop()
 {
+  status = 0;
+  while(!timeClient.update()) {
+    timeClient.forceUpdate();
+  }
+  timestamp = timeClient.getEpochTime();
+
   hr_rate_t hr_rate = hr_rate_meas();
   Serial.print("IR=");
   Serial.print(hr_rate.ir);
@@ -88,6 +152,24 @@ void loop()
   Serial.print(", isOnSide=");
   Serial.print(acc_data.isOnSide);
   Serial.println();
+
+  if (millis()- last_publish > 10000) {
+    if(acc_data.isMoving) status |= STATUS_IS_MOVING;
+    if(acc_data.isOnFeet) status |= STATUS_IS_ON_FEET;
+    if(acc_data.isOnSide) status |= STATUS_IS_ON_SIDE;
+    doc["timestamp"] = timestamp;
+    doc["status"] = status;
+    doc["hr"] = hr_rate.bpm_avg;
+    bytes_written = serializeJson(doc, buffer, JSON_BUFFER_LEN);
+
+    while (!mqttClient.connected())
+    {
+      reconnect();
+    }
+    mqttClient.publish(mqtt_out_topic, buffer, bytes_written);
+    mqttClient.loop();
+    last_publish = millis();
+  }
 
   delay(10);
 }
@@ -172,4 +254,34 @@ acc_data_t acc_loop()
     }
   }
   return acc_data;
+}
+
+//callback includes topic and payload ( from which (topic) the payload is comming)
+void callback(char* topic, byte* payload, unsigned int length) {
+  Serial.print("Message arrived [");
+  Serial.print(topic);
+  Serial.print("] ");
+  for (int i = 0; i < length; i++)
+  {
+    Serial.print((char)payload[i]);
+  }
+  Serial.println();
+}
+
+void reconnect() {
+  while (!mqttClient.connected()) {
+    Serial.println("Attempting MQTT connection...");
+    if (mqttClient.connect("ESP32_clientID", mqtt_user, mqtt_pass)) {
+      Serial.println("connected");
+      // Once connected, resubscribe
+      mqttClient.subscribe(mqtt_in_topic);
+
+    } else {
+      Serial.print("failed, rc=");
+      Serial.print(mqttClient.state());
+      Serial.println(" try again in 5 seconds");
+      // Wait 5 seconds before retrying
+      delay(5000);
+    }
+  }
 }
