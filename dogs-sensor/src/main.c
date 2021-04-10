@@ -56,10 +56,10 @@ void get_bpm(void* param) {
         max30100_update(&max30100, &result);
         if(result.pulse_detected) {
             printf("BEAT\n");
-            printf("BPM: %f | SpO2: %f%%\n", result.heart_bpm, result.spO2);
+            printf("BPM: %f \n", result.heart_bpm);
         }
         //Update rate: 100Hz
-        vTaskDelay(100/portTICK_PERIOD_MS);
+        vTaskDelay(10/portTICK_PERIOD_MS);
     }
 }
 
@@ -69,19 +69,18 @@ void app_main()
     ESP_ERROR_CHECK(i2c_master_init(I2C_PORT));
     //Init sensor at I2C_NUM_0
     vTaskDelay(1000/portTICK_PERIOD_MS);
-    ESP_ERROR_CHECK(max30100_init( &max30100, I2C_PORT,
+    ESP_ERROR_CHECK(max30100_init(&max30100, I2C_PORT,
                    MAX30100_MODE_SPO2_HR,
                    MAX30100_SAMPLING_RATE_100HZ,
                    MAX30100_PULSE_WIDTH_118US_ADC_16,
-                   MAX30100_LED_CURRENT_50MA/8,
-                   MAX30100_LED_CURRENT_50MA/16,
-                   MAX30100_DEFAULT_MEAN_FILTER_SIZE,
-                   MAX30100_DEFAULT_PULSE_BPM_SAMPLE_SIZE,
+                   MAX30100_LED_CURRENT_50MA,
+                   MAX30100_LED_CURRENT_50MA,
+                   600,
                    MAX30100_ADC_RANGE_16384nA, true));
     printf("Print regs\n");
     max30100_print_registers(&max30100);
     //Start test task
-    xTaskCreate(get_bpm, "Get BPM", 8192, NULL, 1, NULL);
+    xTaskCreate(get_bpm, "Get BPM", 16384, NULL, 1, NULL);
 }
 
 /**

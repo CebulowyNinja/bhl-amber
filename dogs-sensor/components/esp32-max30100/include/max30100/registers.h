@@ -63,31 +63,6 @@ typedef enum _pulse_state_machine {
  */
 
 /**
- * @brief Pulse detection algorithm.
- * 
- * @details Called by the update function.
- * 
- * @param this is the address of the configuration structure.
- * @param sensor_value is the value read from the sensor after the filters
- * 
- * @returns true if detected.
- */
-bool max30100_detect_pulse(max30100_config_t* this, float sensor_value);
-
-/**
- * @brief Balance intensities filter.
- * 
- * @details DC filter for the raw values.
- * 
- * @param this is the address of the configuration structure.
- * @param red_dc is the w in red led dc filter structure.
- * @param ir_dc is the w in ir led dc filter structure.
- * 
- * @returns status of execution.
- */
-esp_err_t max30100_balance_intensities(max30100_config_t* this, float red_dc, float ir_dc);
-
-/**
  * @brief Write to the MAX30100 register.
  * 
  * @param this is the address of the configuration structure.
@@ -131,36 +106,6 @@ esp_err_t max30100_read_from( max30100_config_t* this, uint8_t address,
  * @returns status of execution.
  */
 esp_err_t max30100_read_fifo(max30100_config_t* this, max30100_fifo_t* fifo);
-
-/**
- * @brief Removes the DC offset of the sensor value.
- * 
- * @param this is the address of the configuration structure.
- * @param x is the raw value read from the led.
- * @param prev_w is the previous filtered w from the dc filter structure.
- * @param alpha is the dc filter alpha parameter.
- * 
- * @returns a dc filter structure.
- */
-max30100_dc_filter_t max30100_dc_removal(float x, float prev_w, float alpha);
-
-/**
- * @brief Applies the mean diff filter.
- * 
- * @param this is the address of the configuration structure.
- * @param M is the filtered DC result of the dc filter structure.
- * 
- * @returns a filtered value.
- */
-float max30100_mean_diff(max30100_config_t* this, float M);
-
-/**
- * @brief Applies a low-pass butterworth filter.
- * 
- * @param this is the address of the configuration structure.
- * @param x is the mean diff filtered value.
- */
-void max30100_lpb_filter(max30100_config_t* this, float x);
 
 #endif
 
