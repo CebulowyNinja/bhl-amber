@@ -36,11 +36,37 @@ long lastBeat = 0; //Time at which the last beat occurred
 float beatsPerMinute;
 int beatAvg;
 
+typedef struct _hr_rate_t {
+  long ir;
+  float bpm;
+  int bpm_avg;
+  bool is_valid;
+} hr_rate_t;
+
+void hr_rate_init();
 void setup()
 {
   Serial.begin(115200);
   Serial.println("Initializing...");
+  hr_rate_init();
+}
 
+hr_rate_t hr_rate_meas();
+void loop()
+{
+  hr_rate_t hr_rate = hr_rate_meas();
+  Serial.print("IR=");
+  Serial.print(hr_rate.ir);
+  Serial.print(", BPM=");
+  Serial.print(hr_rate.bpm);
+  Serial.print(", BPM_AVG=");
+  Serial.print(hr_rate.bpm_avg);
+  Serial.print(", IS_VALID=");
+  Serial.print(hr_rate.is_valid);
+  Serial.println();
+}
+
+void hr_rate_init() {
   // Initialize sensor
   if (!particleSensor.begin(Wire, I2C_SPEED_FAST)) //Use default I2C port, 400kHz speed
   {
@@ -53,8 +79,8 @@ void setup()
   particleSensor.setPulseAmplitudeGreen(0); //Turn off Green LED
 }
 
-void loop()
-{
+hr_rate_t hr_rate_meas() {
+  hr_rate_t hr;
   long irValue = particleSensor.getIR();
 
   if (checkForBeat(irValue) == true)
@@ -77,16 +103,12 @@ void loop()
       beatAvg /= RATE_SIZE;
     }
   }
-
-  Serial.print("IR=");
-  Serial.print(irValue);
-  Serial.print(", BPM=");
-  Serial.print(beatsPerMinute);
-  Serial.print(", Avg BPM=");
-  Serial.print(beatAvg);
-
+  hr.ir = irValue;
+  hr.bpm = beatsPerMinute;
+  hr.bpm_avg = beatAvg;
+  hr.is_valid = true;
   if (irValue < 50000)
-    Serial.print(" No finger?");
+    hr.is_valid = false;
 
-  Serial.println();
+  return hr;
 }
